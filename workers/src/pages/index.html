@@ -44,9 +44,12 @@
         <div>
             <label for="entry_type">Entry Type:</label>
             <select id="entry_type" name="entry_type" required>
-                <option value="ticket">Ticket</option>
-                <option value="food">Food</option>
-                <option value="merchandise">Merchandise</option>
+                <option value="Ticket Artist">Ticket Artist</option>
+                <option value="Ticket Free">Ticket Free</option>
+                <option value="Ticket 50">Ticket 50</option>
+                <option value="Ticket 100">Ticket 100</option>
+                <option value="Ticket 150">Ticket 150</option>
+                <option value="Ticket 200">Ticket 200</option>
             </select>
         </div>
         <div>
@@ -57,6 +60,40 @@
     </form>
 
     <script>
+        // Function to update price based on selected ticket type
+        function updatePrice() {
+            const entryType = document.getElementById('entry_type').value;
+            const priceField = document.getElementById('price');
+            
+            // Set price based on ticket type
+            switch(entryType) {
+                case 'Ticket Artist':
+                case 'Ticket Free':
+                    priceField.value = '0';
+                    break;
+                case 'Ticket 50':
+                    priceField.value = '50';
+                    break;
+                case 'Ticket 100':
+                    priceField.value = '100';
+                    break;
+                case 'Ticket 150':
+                    priceField.value = '150';
+                    break;
+                case 'Ticket 200':
+                    priceField.value = '200';
+                    break;
+                default:
+                    priceField.value = '';
+            }
+        }
+        
+        // Update price when ticket type changes
+        document.getElementById('entry_type').addEventListener('change', updatePrice);
+        
+        // Update price on page load
+        document.addEventListener('DOMContentLoaded', updatePrice);
+        
         document.getElementById('entryForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
