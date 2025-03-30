@@ -1,0 +1,14 @@
+{
+  "name": "cloudflare-ticket-logger",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev src/index.js",
+    "deploy": "wrangler deploy src/index.js",
+    "db:apply": "wrangler d1 migrations apply entries"
+  },
+  "dependencies": {
+    "@cloudflare/kv-asset-handler": "^0.4.0",
+    "@cloudflare/workers-types": "^4.20240312.0"
+  }
+}
