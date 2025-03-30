@@ -11,6 +11,11 @@ binding = "DB"
 database_name = "entries-local"
 database_id = "e7c4a4a6-7174-4a8c-9cfc-0f57b654d039"
 
+[[kv_namespaces]]
+binding = "STATIC_CONTENT"
+id = "7d57df0bfdc0492ba3442fe12c92b56d"
+preview_id = "7d57df0bfdc0492ba3442fe12c92b56d"
+
 [env.production]
 [[env.production.d1_databases]]
 binding = "DB"
