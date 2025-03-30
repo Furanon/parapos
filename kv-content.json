@@ -1,0 +1,12 @@
+[
+  {
+    "key": "index.html",
+    "value": "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>Entry Logger</title>...</head></html>",
+    "base64": true
+  },
+  {
+    "key": "dashboard.html",
+    "value": "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>Entry Dashboard</title>...</head></html>",
+    "base64": true
+  }
+]
