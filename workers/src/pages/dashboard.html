@@ -47,6 +47,8 @@
                 <tr>
                     <th>Entry Type</th>
                     <th>Count</th>
+                    <th>Total Value</th>
+                    <th>Average Price</th>
                 </tr>
             </thead>
             <tbody>
@@ -62,14 +64,18 @@
                 if (!response.ok) throw new Error('Failed to fetch summary');
                 
                 const data = await response.json();
+                if (!data.results) throw new Error('Invalid response format');
+                
                 const tbody = document.querySelector('#summaryTable tbody');
                 tbody.innerHTML = ''; // Clear existing rows
                 
-                data.forEach(item => {
+                data.results.forEach(item => {
                     const row = document.createElement('tr');
                     row.innerHTML = `
                         <td>${item.entry_type}</td>
                         <td>${item.count}</td>
+                        <td>$${(item.total_value || 0).toFixed(2)}</td>
+                        <td>$${(item.average_price || 0).toFixed(2)}</td>
                     `;
                     tbody.appendChild(row);
                 });
