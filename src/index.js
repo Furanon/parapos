@@ -1,4 +1,4 @@
-import { getAssetFromKV, NotFoundError } from '@cloudflare/kv-asset-handler';
+// No imports needed
 
 function getDateRangeFilter(searchParams) {
     const startDate = searchParams.get('start_date');
@@ -355,52 +355,13 @@ export default {
             return new Response('Not Found', { status: 404 });
         }
 
-        // Static files
-        try {
-            let filePath = path;
-            if (path === '/' || path === '') {
-                filePath = '/index.html';
+        // For all non-API routes, return 404 to let Pages handle them
+        console.log(`Non-API route requested: ${path}, returning 404 to let Pages handle it`);
+        return new Response('Not Found', { 
+            status: 404,
+            headers: {
+                'Content-Type': 'text/plain'
             }
-            
-            console.log(`Attempting to serve static file: ${filePath}`);
-            
-            // Remove leading slash for KV lookup
-            const key = filePath.replace(/^\//, '');
-            const asset = await env.STATIC_CONTENT.get(key, 'text');
-            
-            if (asset === null) {
-                console.warn(`Static file not found: ${key}`);
-                return new Response(`Not Found: ${key}`, { 
-                    status: 404,
-                    headers: {
-                        'Content-Type': 'text/plain'
-                    }
-                });
-            }
-            
-            console.log(`Successfully retrieved static file: ${key}`);
-
-            const contentType = {
-                '.html': 'text/html; charset=utf-8',
-                '.css': 'text/css',
-                '.js': 'application/javascript',
-            }[filePath.substring(filePath.lastIndexOf('.'))] || 'text/plain';
-
-            return new Response(asset, {
-                headers: { 
-                    'Content-Type': contentType,
-                    'Cache-Control': 'public, max-age=3600'
-                }
-            });
-        } catch (e) {
-            console.error('Error serving static file:', e.message);
-            console.error('Error stack:', e.stack);
-            return new Response(`Internal Server Error: ${e.message}`, { 
-                status: 500,
-                headers: {
-                    'Content-Type': 'text/plain'
-                }
-            });
-        }
+        });
     }
 };
