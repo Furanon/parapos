@@ -32,7 +32,7 @@ export default {
             if (path === '/api/summary' && request.method === 'GET') {
                 try {
                     const stmt = await env.DB.prepare(
-                        'SELECT entry_type, COUNT(*) as count FROM entries GROUP BY entry_type'
+                        'SELECT entry_type, COUNT(*) as count, SUM(price) as total_value, AVG(price) as average_price FROM entries GROUP BY entry_type'
                     );
                     const results = await stmt.all();
                     return new Response(JSON.stringify(results), {
