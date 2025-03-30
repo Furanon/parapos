@@ -1,10 +1,10 @@
 name = "cloudflare-ticket-logger"
-main = "src/index.js"
+main = "./src/index.js"
 compatibility_date = "2024-03-30"
 
-# Workers Sites configuration
-[site]
-bucket = "./src/pages"
+# Assets binding for Pages
+[assets]
+directory = "./src/pages"
 
 [[d1_databases]]
 binding = "DB"
@@ -16,4 +16,3 @@ database_id = "e7c4a4a6-7174-4a8c-9cfc-0f57b654d039"
 binding = "DB"
 database_name = "entries-production"
 database_id = "e7c4a4a6-7174-4a8c-9cfc-0f57b654d039"
-

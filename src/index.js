@@ -1,5 +1,4 @@
-// No imports needed
-
+// No import needed for Pages plugin approach
 function getDateRangeFilter(searchParams) {
     const startDate = searchParams.get('start_date');
     const endDate = searchParams.get('end_date');
@@ -355,13 +354,8 @@ export default {
             return new Response('Not Found', { status: 404 });
         }
 
-        // For all non-API routes, return 404 to let Pages handle them
-        console.log(`Non-API route requested: ${path}, returning 404 to let Pages handle it`);
-        return new Response('Not Found', { 
-            status: 404,
-            headers: {
-                'Content-Type': 'text/plain'
-            }
-        });
+        // For non-API routes, just return null to let Pages handle it
+        console.log(`Non-API route requested: ${path}, letting Pages handle it`);
+        return env.ASSETS.fetch(request);
     }
 };
