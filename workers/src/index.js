@@ -1,5 +1,23 @@
 import { getAssetFromKV, NotFoundError } from '@cloudflare/kv-asset-handler';
 
+function getDateRangeFilter(searchParams) {
+    const startDate = searchParams.get('start_date');
+    const endDate = searchParams.get('end_date');
+    let whereClause = [];
+    let bindValues = [];
+    
+    if (startDate) {
+        whereClause.push('entry_date >= ?');
+        bindValues.push(startDate);
+    }
+    if (endDate) {
+        whereClause.push('entry_date <= ?');
+        bindValues.push(endDate);
+    }
+    
+    return { whereClause, bindValues };
+}
+
 export default {
     async fetch(request, env, ctx) {
         const url = new URL(request.url);
@@ -65,7 +83,6 @@ export default {
                     });
                 }
             }
-
             if (path === '/api/summary' && request.method === 'GET') {
                 console.log('Handling summary request');
                 try {
@@ -107,9 +124,14 @@ export default {
                     const filterDay = params.get('day');
                     
                     // Build dynamic query with filters
-                    let query = 'SELECT entry_date, entry_type, COUNT(*) as count, SUM(price) as total_value, AVG(price) as average_price FROM entries';
+                    let query = 'SELECT entry_type, COUNT(*) as count, SUM(price) as total_value, AVG(price) as average_price FROM entries';
                     let whereClause = [];
                     let bindValues = [];
+                    
+                    // Add date range filtering
+                    const dateRangeFilter = getDateRangeFilter(params);
+                    whereClause = [...whereClause, ...dateRangeFilter.whereClause];
+                    bindValues = [...bindValues, ...dateRangeFilter.bindValues];
                     
                     if (filterDate) {
                         whereClause.push('entry_date = ?');
@@ -135,19 +157,25 @@ export default {
                     if (whereClause.length > 0) {
                         query += ' WHERE ' + whereClause.join(' AND ');
                     }
+                    // Default grouping by entry type only (simplified response structure)
+                    query += ' GROUP BY entry_type';
                     
-                    // Default grouping by date and entry type
-                    query += ' GROUP BY entry_date, entry_type';
-                    
-                    // Get daily summary grouped by entry type
+                    // Get summary grouped by entry type
                     const stmt = await env.DB.prepare(query);
-                    if (bindValues.length > 0) {
-                        stmt.bind(...bindValues);
-                    }
-                    const results = await stmt.all();
+                    const results = bindValues.length > 0 ? 
+                        await stmt.bind(...bindValues).all() :
+                        await stmt.all();
                     console.log('Summary results:', JSON.stringify(results));
                     
-                    return new Response(JSON.stringify(results), {
+                    return new Response(JSON.stringify({
+                        success: true,
+                        meta: {
+                            filtered: whereClause.length > 0,
+                            start_date: params.get('start_date'),
+                            end_date: params.get('end_date')
+                        },
+                        results: results.results
+                    }), {
                         headers: {
                             'Content-Type': 'application/json',
                             'Access-Control-Allow-Origin': '*',
@@ -173,12 +201,33 @@ export default {
             // API endpoint for date-based summary
             if (path === '/api/daily-summary' && request.method === 'GET') {
                 try {
-                    const stmt = await env.DB.prepare(
-                        'SELECT entry_date, SUM(price) as daily_total, COUNT(*) as entry_count FROM entries GROUP BY entry_date ORDER BY entry_date DESC'
-                    );
-                    const results = await stmt.all();
+                    // Parse URL parameters for date range filtering
+                    const searchParams = new URL(request.url).searchParams;
+                    const { whereClause, bindValues } = getDateRangeFilter(searchParams);
                     
-                    return new Response(JSON.stringify(results), {
+                    // Build the query with optional date filters
+                    let query = 'SELECT entry_date, SUM(price) as daily_total, COUNT(*) as entry_count FROM entries';
+                    
+                    if (whereClause.length > 0) {
+                        query += ' WHERE ' + whereClause.join(' AND ');
+                    }
+                    
+                    query += ' GROUP BY entry_date ORDER BY entry_date DESC';
+                    
+                    // Prepare and execute the query with the correct binding
+                    const stmt = await env.DB.prepare(query);
+                    const results = bindValues.length > 0 ? 
+                        await stmt.bind(...bindValues).all() :
+                        await stmt.all();
+                    return new Response(JSON.stringify({
+                        success: true,
+                        meta: {
+                            filtered: whereClause.length > 0,
+                            start_date: searchParams.get('start_date'),
+                            end_date: searchParams.get('end_date')
+                        },
+                        results: results.results
+                    }), {
                         headers: {
                             'Content-Type': 'application/json',
                             'Access-Control-Allow-Origin': '*',
@@ -189,9 +238,9 @@ export default {
                     console.error('Failed to fetch daily summary:', error);
                     return new Response(JSON.stringify({ 
                         error: 'Failed to fetch daily summary',
-                        message: error.message
+                        message: error.message,
+                        details: 'There was an error filtering or retrieving the daily summary data'
                     }), {
-                        status: 500,
                         headers: {
                             'Content-Type': 'application/json',
                             'Access-Control-Allow-Origin': '*'
@@ -203,12 +252,33 @@ export default {
             // API endpoint for weekly summary
             if (path === '/api/weekly-summary' && request.method === 'GET') {
                 try {
-                    const stmt = await env.DB.prepare(
-                        'SELECT year, week, SUM(price) as weekly_total, COUNT(*) as entry_count FROM entries GROUP BY year, week ORDER BY year DESC, week DESC'
-                    );
-                    const results = await stmt.all();
+                    // Parse URL parameters for date range filtering
+                    const searchParams = new URL(request.url).searchParams;
+                    const { whereClause, bindValues } = getDateRangeFilter(searchParams);
                     
-                    return new Response(JSON.stringify(results), {
+                    // Build the query with optional date filters
+                    let query = 'SELECT year, week, SUM(price) as weekly_total, COUNT(*) as entry_count FROM entries';
+                    
+                    if (whereClause.length > 0) {
+                        query += ' WHERE ' + whereClause.join(' AND ');
+                    }
+                    
+                    query += ' GROUP BY year, week ORDER BY year DESC, week DESC';
+                    
+                    // Prepare and execute the query with the correct binding
+                    const stmt = await env.DB.prepare(query);
+                    const results = bindValues.length > 0 ? 
+                        await stmt.bind(...bindValues).all() :
+                        await stmt.all();
+                    return new Response(JSON.stringify({
+                        success: true,
+                        meta: {
+                            filtered: whereClause.length > 0,
+                            start_date: searchParams.get('start_date'),
+                            end_date: searchParams.get('end_date')
+                        },
+                        results: results.results
+                    }), {
                         headers: {
                             'Content-Type': 'application/json',
                             'Access-Control-Allow-Origin': '*',
@@ -219,9 +289,9 @@ export default {
                     console.error('Failed to fetch weekly summary:', error);
                     return new Response(JSON.stringify({ 
                         error: 'Failed to fetch weekly summary',
-                        message: error.message
+                        message: error.message,
+                        details: 'There was an error filtering or retrieving the weekly summary data'
                     }), {
-                        status: 500,
                         headers: {
                             'Content-Type': 'application/json',
                             'Access-Control-Allow-Origin': '*'
@@ -233,12 +303,33 @@ export default {
             // API endpoint for monthly summary
             if (path === '/api/monthly-summary' && request.method === 'GET') {
                 try {
-                    const stmt = await env.DB.prepare(
-                        'SELECT year, month, SUM(price) as monthly_total, COUNT(*) as entry_count FROM entries GROUP BY year, month ORDER BY year DESC, month DESC'
-                    );
-                    const results = await stmt.all();
+                    // Parse URL parameters for date range filtering
+                    const searchParams = new URL(request.url).searchParams;
+                    const { whereClause, bindValues } = getDateRangeFilter(searchParams);
                     
-                    return new Response(JSON.stringify(results), {
+                    // Build the query with optional date filters
+                    let query = 'SELECT year, month, SUM(price) as monthly_total, COUNT(*) as entry_count FROM entries';
+                    
+                    if (whereClause.length > 0) {
+                        query += ' WHERE ' + whereClause.join(' AND ');
+                    }
+                    
+                    query += ' GROUP BY year, month ORDER BY year DESC, month DESC';
+                    
+                    // Prepare and execute the query with the correct binding
+                    const stmt = await env.DB.prepare(query);
+                    const results = bindValues.length > 0 ? 
+                        await stmt.bind(...bindValues).all() :
+                        await stmt.all();
+                    return new Response(JSON.stringify({
+                        success: true,
+                        meta: {
+                            filtered: whereClause.length > 0,
+                            start_date: searchParams.get('start_date'),
+                            end_date: searchParams.get('end_date')
+                        },
+                        results: results.results
+                    }), {
                         headers: {
                             'Content-Type': 'application/json',
                             'Access-Control-Allow-Origin': '*',
@@ -249,7 +340,8 @@ export default {
                     console.error('Failed to fetch monthly summary:', error);
                     return new Response(JSON.stringify({ 
                         error: 'Failed to fetch monthly summary',
-                        message: error.message
+                        message: error.message,
+                        details: 'There was an error filtering or retrieving the monthly summary data'
                     }), {
                         status: 500,
                         headers: {

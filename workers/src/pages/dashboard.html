@@ -62,14 +62,22 @@
         }
         .date-selector {
             margin: 20px 0;
-            padding: 10px;
+            padding: 15px;
             background-color: #f2f2f2;
             border-radius: 5px;
             display: flex;
             flex-wrap: wrap;
-            gap: 10px;
+            gap: 15px;
+            align-items: center;
         }
-        .date-selector select, .date-selector button {
+        .filter-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .date-selector select, 
+        .date-selector input[type="date"], 
+        .date-selector button {
             padding: 8px;
             border-radius: 4px;
             border: 1px solid #ddd;
@@ -79,6 +87,7 @@
             color: white;
             border: none;
             cursor: pointer;
+            padding: 8px 16px;
         }
         .date-selector button:hover {
             background-color: #45a049;
@@ -90,6 +99,11 @@
         <a href="/index.html">Back to Entry Form</a>
     </div>
     <h1>Entry Dashboard</h1>
+    <div id="loadingIndicator" style="display: none; text-align: center; padding: 20px;">
+        <p>Loading data...</p>
+    </div>
+    <div id="errorMessage" style="display: none; color: red; text-align: center; padding: 20px;">
+    </div>
     <div class="summary">
         <h2>Summary</h2>
         <table id="summaryTable">
@@ -108,13 +122,22 @@
     </div>
 
     <div class="date-selector">
-        <label for="timeRange">Time Range:</label>
-        <select id="timeRange">
-            <option value="7">Last 7 Days</option>
-            <option value="30">Last 30 Days</option>
-            <option value="90">Last 3 Months</option>
-            <option value="all">All Time</option>
-        </select>
+        <div class="filter-group">
+            <label for="timeRange">Quick Range:</label>
+            <select id="timeRange">
+                <option value="7">Last 7 Days</option>
+                <option value="30">Last 30 Days</option>
+                <option value="90">Last 3 Months</option>
+                <option value="all">All Time</option>
+                <option value="custom">Custom Range</option>
+            </select>
+        </div>
+        <div class="filter-group" id="customDateRange" style="display: none;">
+            <label for="startDate">Start Date:</label>
+            <input type="date" id="startDate">
+            <label for="endDate">End Date:</label>
+            <input type="date" id="endDate">
+        </div>
         <button id="updateCharts">Update Charts</button>
     </div>
 
@@ -141,13 +164,32 @@
     </div>
 
     <script>
+        function showLoading() {
+            document.getElementById('loadingIndicator').style.display = 'block';
+            document.getElementById('errorMessage').style.display = 'none';
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingIndicator').style.display = 'none';
+        }
+
+        function showError(message) {
+            hideLoading();
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+        
         async function loadSummary() {
+            showLoading();
             try {
                 const response = await fetch('/api/summary');
                 if (!response.ok) throw new Error('Failed to fetch summary');
                 
                 const data = await response.json();
-                if (!data.results) throw new Error('Invalid response format');
+                if (!data.success || !data.results) {
+                    throw new Error('Invalid response format');
+                }
                 
                 const tbody = document.querySelector('#summaryTable tbody');
                 tbody.innerHTML = ''; // Clear existing rows
@@ -162,9 +204,10 @@
                     `;
                     tbody.appendChild(row);
                 });
+                hideLoading();
             } catch (error) {
                 console.error('Error:', error);
-                alert('Failed to load summary. Please try again.');
+                showError('Failed to load summary data. Please try again.');
             }
         }
 
@@ -197,14 +240,19 @@
         }
 
         // Load daily trend data
-        async function loadDailyTrend() {
+        async function loadDailyTrend(dateParams = '') {
+            showLoading();
             try {
-                const response = await fetch('/api/daily-summary');
+                const response = await fetch('/api/daily-summary' + dateParams);
                 if (!response.ok) throw new Error('Failed to fetch daily data');
                 
                 const data = await response.json();
-                const days = data.results.map(item => formatDate(item.date));
-                const values = data.results.map(item => item.total_value);
+                if (!data.success) {
+                    throw new Error('Invalid response format');
+                }
+                
+                const days = data.results.map(item => formatDate(item.entry_date));
+                const values = data.results.map(item => item.daily_total);
                 
                 const ctx = document.getElementById('trendChart').getContext('2d');
                 
@@ -246,18 +294,25 @@
                         }
                     }
                 });
+                hideLoading();
             } catch (error) {
                 console.error('Error loading daily trend:', error);
+                showError('Failed to load daily trend data.');
             }
         }
 
         // Load ticket type distribution
-        async function loadTicketDistribution() {
+        async function loadTicketDistribution(dateParams = '') {
+            showLoading();
             try {
-                const response = await fetch('/api/summary');
+                const response = await fetch('/api/summary' + dateParams);
                 if (!response.ok) throw new Error('Failed to fetch summary data');
                 
                 const data = await response.json();
+                if (!data.success) {
+                    throw new Error('Invalid response format');
+                }
+                
                 const labels = data.results.map(item => item.entry_type);
                 const values = data.results.map(item => item.count);
                 const colors = generateColors(labels.length);
@@ -291,21 +346,28 @@
                         }
                     }
                 });
+                hideLoading();
             } catch (error) {
                 console.error('Error loading ticket distribution:', error);
+                showError('Failed to load ticket type distribution data.');
             }
         }
 
         // Load weekly comparison
-        async function loadWeeklyComparison() {
+        async function loadWeeklyComparison(dateParams = '') {
+            showLoading();
             try {
-                const response = await fetch('/api/weekly-summary');
+                const response = await fetch('/api/weekly-summary' + dateParams);
                 if (!response.ok) throw new Error('Failed to fetch weekly data');
                 
                 const data = await response.json();
-                const weeks = data.results.map(item => `Week ${item.week}`);
-                const values = data.results.map(item => item.total_value);
-                const counts = data.results.map(item => item.count);
+                if (!data.success) {
+                    throw new Error('Invalid response format');
+                }
+                
+                const weeks = data.results.map(item => `Week ${item.week} ${item.year}`);
+                const values = data.results.map(item => item.weekly_total);
+                const counts = data.results.map(item => item.entry_count);
                 
                 const ctx = document.getElementById('barChart').getContext('2d');
                 
@@ -355,23 +417,30 @@
                         }
                     }
                 });
+                hideLoading();
             } catch (error) {
                 console.error('Error loading weekly comparison:', error);
+                showError('Failed to load weekly comparison data.');
             }
         }
 
         // Load monthly revenue
-        async function loadMonthlyRevenue() {
+        async function loadMonthlyRevenue(dateParams = '') {
+            showLoading();
             try {
-                const response = await fetch('/api/monthly-summary');
+                const response = await fetch('/api/monthly-summary' + dateParams);
                 if (!response.ok) throw new Error('Failed to fetch monthly data');
                 
                 const data = await response.json();
+                if (!data.success) {
+                    throw new Error('Invalid response format');
+                }
+                
                 const months = data.results.map(item => {
                     const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
                     return `${monthNames[item.month - 1]} ${item.year}`;
                 });
-                const values = data.results.map(item => item.total_value);
+                const values = data.results.map(item => item.monthly_total);
                 
                 const ctx = document.getElementById('monthlyChart').getContext('2d');
                 
@@ -412,8 +481,10 @@
                         }
                     }
                 });
+                hideLoading();
             } catch (error) {
                 console.error('Error loading monthly revenue:', error);
+                showError('Failed to load monthly revenue data.');
             }
         }
 
@@ -425,15 +496,72 @@
             loadMonthlyRevenue();
         }
 
+        // Initialize date inputs with default range
+        function initializeDateInputs() {
+            const endDate = new Date();
+            const startDate = new Date();
+            startDate.setDate(startDate.getDate() - 30); // Default to last 30 days
+            
+            document.getElementById('endDate').valueAsDate = endDate;
+            document.getElementById('startDate').valueAsDate = startDate;
+        }
+
+        // Add event listener for time range changes
+        document.getElementById('timeRange').addEventListener('change', function() {
+            const customDateRange = document.getElementById('customDateRange');
+            if (this.value === 'custom') {
+                customDateRange.style.display = 'flex';
+            } else {
+                customDateRange.style.display = 'none';
+            }
+        });
+
+        // Function to get date parameters based on selection
+        function getDateParams() {
+            const timeRange = document.getElementById('timeRange').value;
+            
+            if (timeRange === 'custom') {
+                const startDate = document.getElementById('startDate').value;
+                const endDate = document.getElementById('endDate').value;
+                if (!startDate || !endDate) {
+                    alert('Please select both start and end dates');
+                    return null;
+                }
+                return `?start_date=${startDate}&end_date=${endDate}`;
+            }
+            
+            if (timeRange === 'all') return '';
+            
+            const end_date = new Date().toISOString().split('T')[0];
+            const start_date = new Date();
+            start_date.setDate(start_date.getDate() - parseInt(timeRange));
+            
+            return `?start_date=${start_date.toISOString().split('T')[0]}&end_date=${end_date}`;
+        }
+
         // Initialize charts on page load
+        initializeDateInputs();
         loadAllCharts();
 
         // Update charts when the user changes the time range
-        document.getElementById('updateCharts').addEventListener('click', function() {
-            const timeRange = document.getElementById('timeRange').value;
-            // In a real implementation, you would pass the time range to your API calls
-            // For now, we'll just reload all charts
-            loadAllCharts();
+        document.getElementById('updateCharts').addEventListener('click', async function() {
+            showLoading();
+            try {
+                const dateParams = getDateParams();
+                if (dateParams === null) return; // Invalid date selection
+                
+                await Promise.all([
+                    loadDailyTrend(dateParams),
+                    loadTicketDistribution(dateParams),
+                    loadWeeklyComparison(dateParams),
+                    loadMonthlyRevenue(dateParams)
+                ]);
+                
+                hideLoading();
+            } catch (error) {
+                console.error('Error updating charts:', error);
+                showError('Failed to update charts with selected time range.');
+            }
         });
 
     </script>
